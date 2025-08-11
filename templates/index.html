@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FikrFree Assistant</title>
+  <link rel="stylesheet" href="static/chatbot.css" />
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="static/chatbot.js" defer></script>
+</head>
+<body>
+  <div class="container web-view">
+    <button class="view-toggle" id="view-toggle-btn" onclick="toggleView()" aria-label="Toggle web/mobile view">
+      <svg class="toggle-icon" id="web-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+        <path d="M8 4v14M16 4v14M2 8h20M2 14h20" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <svg class="toggle-icon" id="mobile-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" style="display:none">
+        <rect x="5" y="2" width="14" height="20" rx="2" stroke="currentColor" stroke-width="2"/>
+        <circle cx="12" cy="18" r="1" fill="currentColor"/>
+        <path d="M8 5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <div class="header-area">
+      <div class="brand">
+        <img src="/static/assets/fikrfree-logo.png" alt="FikrFree logo" class="brand-logo"/>
+        <div class="brand-copy">
+          <h1 class="app-title">FikrFree Assistant</h1>
+          <p class="tagline">Your digital insurance & healthcare guide</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="chat-box" class="chat-box" role="log" aria-live="polite" aria-label="Chat messages"></div>
+
+    <div class="input-area" role="form" aria-label="Send a message">
+      <div class="input-container">
+        <div class="input-wrapper">
+          <input id="user-input" type="text" placeholder="Ask about plans, claims, doctors, e‑pharmacy…" class="form-control" aria-label="Type your message" />
+          <button id="mic-btn" class="btn btn-secondary" title="Speak">
+            <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="11" r="4" stroke="currentColor" stroke-width="2"/>
+              <rect x="9" y="3" width="6" height="10" rx="3" stroke="currentColor" stroke-width="2"/>
+              <path d="M19 11v1a7 7 0 0 1-14 0v-1" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 19v2" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
+        <button id="send-btn" class="btn btn-primary" onclick="sendMessage()">Send</button>
+        <button id="stop-btn" class="btn btn-secondary" onclick="stopResponse()" style="display:none">Stop</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
