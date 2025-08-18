@@ -3,8 +3,8 @@ data/
 Raw/
 main_index/
 uvicorn_service.py
-feedback.csv
 start_uvicorn.bat
 .python-version
 __pycache__/
 app/__pycache__/.env
+.claude/

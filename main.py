@@ -1,9 +1,11 @@
 # app/main.py
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from app.index_generator import generate_indexes, init_indexes
 from app.index_listener import start_listener
 from typing import Dict
 from app.api import router as api_router
+from app.api_v1 import api_v1_router
 from llama_index.core import VectorStoreIndex
 import cProfile
 import pstats
@@ -17,15 +19,29 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 # -------------------
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_indexes()
+    yield
+    # Shutdown (if needed)
+
+app = FastAPI(
+    title="FikrFree Assistant API",
+    description="Intelligent healthcare and insurance chatbot API with bilingual support (English/Roman Urdu)",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan
+)
 indexes: Dict[str, VectorStoreIndex] = {}
 
 # --- Content Security Policy Middleware ---
 CSP_POLICY = (
     "default-src 'self'; "
-    "script-src 'self' https://code.jquery.com 'unsafe-inline'; "
-    "style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data:; "
+    "script-src 'self' https://code.jquery.com https://cdn.jsdelivr.net 'unsafe-inline'; "
+    "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
     "font-src 'self';"
 )
 
@@ -39,8 +55,14 @@ class CSPMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CSPMiddleware)
 # ------------------------------------------
 
-# Allow requests from your React application's domain
-origins = ["http://10.173.2.223:9991"]
+# Allow requests from your React application's domain and API consumers
+origins = [
+    "http://10.173.2.223:9991",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "*"  # Allow all origins for API testing - restrict this in production
+]
 
 # Configure CORS middleware
 app.add_middleware(
@@ -62,10 +84,5 @@ async def serve_frontend(request: Request):
     # Serves your chatbot UI at root URL
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.on_event("startup")
-def startup_event():
-    init_indexes()
-    # Uncomment and edit below if you want to start your listener on startup
-    # start_listener(update_indexes)
-
 app.include_router(api_router)
+app.include_router(api_v1_router)
