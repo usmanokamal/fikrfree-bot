@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FikrFree Assistant - Web Widget Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .demo-content {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .widget-demo {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .chat-toggle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #007AFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .chat-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,122,255,0.4);
+        }
+        
+        .chat-window {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            width: 350px;
+            height: 500px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-window.active {
+            display: flex;
+        }
+        
+        .chat-header {
+            background: #007AFF;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 10px;
+            border-radius: 10px;
+            word-wrap: break-word;
+        }
+        
+        .message.user {
+            align-self: flex-end;
+            background: #007AFF;
+            color: white;
+        }
+        
+        .message.bot {
+            align-self: flex-start;
+            background: #f0f0f0;
+            color: black;
+        }
+        
+        .message.typing {
+            align-self: flex-start;
+            background: #f0f0f0;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .chat-input {
+            padding: 15px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+        
+        .chat-input button {
+            padding: 10px 15px;
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        
+        .language-badge {
+            font-size: 10px;
+            background: rgba(0,0,0,0.1);
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-top: 5px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-content">
+        <h1>🏥 FikrFree Assistant - Web Widget Demo</h1>
+        <p>This page demonstrates how to embed the FikrFree Assistant as a chat widget on any website.</p>
+        
+        <h2>Features:</h2>
+        <ul>
+            <li>✅ <strong>Bilingual Support</strong> - Responds in English or Roman Urdu</li>
+            <li>✅ <strong>Healthcare Expert</strong> - Specialized in Pakistani insurance</li>
+            <li>✅ <strong>Context Aware</strong> - Remembers conversation history</li>
+            <li>✅ <strong>Easy Integration</strong> - Just include the script and CSS</li>
+        </ul>
+        
+        <h2>Try it out:</h2>
+        <p>Click the blue chat button in the bottom-right corner to start chatting!</p>
+        
+        <h3>Sample questions to try:</h3>
+        <ul>
+            <li>"What insurance plans do you offer?"</li>
+            <li>"Tell me about BIMA Bronze plan"</li>
+            <li>"BIMA ke plans kya hain?" (Roman Urdu)</li>
+            <li>"How do I file a claim?"</li>
+        </ul>
+        
+        <h2>Integration Code:</h2>
+        <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto;"><code>&lt;!-- Include the FikrFree Widget --&gt;
+&lt;script src="fikrfree-client-sdk.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+    const widget = new FikrFreeWidget({
+        apiUrl: 'https://your-domain.com/api/v1',
+        position: 'bottom-right'
+    });
+&lt;/script&gt;</code></pre>
+    </div>
+    
+    <!-- Chat Widget -->
+    <div class="widget-demo">
+        <button class="chat-toggle" onclick="toggleChat()">💬</button>
+        
+        <div id="chat-window" class="chat-window">
+            <div class="chat-header">
+                <div>
+                    <strong>🏥 FikrFree Assistant</strong>
+                    <br>
+                    <small>Healthcare & Insurance Help</small>
+                </div>
+                <button class="chat-close" onclick="toggleChat()">&times;</button>
+            </div>
+            
+            <div id="chat-messages" class="chat-messages">
+                <div class="message bot">
+                    👋 Hello! I'm your FikrFree Assistant. Ask me about insurance plans, healthcare, or anything related to FikrFree.
+                    <div class="language-badge">I speak English & Roman Urdu!</div>
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <input 
+                    type="text" 
+                    id="chat-input" 
+                    placeholder="Ask about insurance plans..."
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Include the SDK -->
+    <script src="../fikrfree-client-sdk.js"></script>
+    
+    <script>
+        // Chat Widget Implementation
+        let chatClient = null;
+        let chatOpen = false;
+        
+        function toggleChat() {
+            const chatWindow = document.getElementById('chat-window');
+            chatOpen = !chatOpen;
+            
+            if (chatOpen) {
+                chatWindow.classList.add('active');
+                if (!chatClient) {
+                    // Initialize client when first opened
+                    chatClient = new FikrFreeClient('https://your-domain.com/api/v1');
+                }
+            } else {
+                chatWindow.classList.remove('active');
+            }
+        }
+        
+        function addMessage(content, type, language = null) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            let messageHTML = content;
+            if (language) {
+                messageHTML += `<div class="language-badge">${language}</div>`;
+            }
+            
+            messageDiv.innerHTML = messageHTML;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function showTyping() {
+            addMessage('Bot is typing...', 'typing');
+        }
+        
+        function removeTyping() {
+            const typingMessage = document.querySelector('.message.typing');
+            if (typingMessage) {
+                typingMessage.remove();
+            }
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message || !chatClient) return;
+            
+            // Add user message
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Show typing indicator
+            showTyping();
+            
+            try {
+                // Send to API
+                const response = await chatClient.chat(message);
+                
+                // Remove typing and add bot response
+                removeTyping();
+                addMessage(response.response, 'bot', response.language_detected);
+                
+            } catch (error) {
+                removeTyping();
+                addMessage(`Sorry, something went wrong: ${error.message}`, 'bot');
+            }
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+        
+        // Demo helper - simulate API calls if SDK not available
+        if (typeof FikrFreeClient === 'undefined') {
+            window.FikrFreeClient = class {
+                constructor(apiUrl) {
+                    this.apiUrl = apiUrl;
+                }
+                
+                async chat(message) {
+                    // Simulate API delay
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Mock responses
+                    const responses = {
+                        'what insurance plans do you offer': 'We offer Bronze, Silver, and Gold plans through our partners like BIMA, EFU, and others.',
+                        'tell me about bima bronze plan': 'BIMA Bronze plan costs PKR 1.2 per day and provides Rs.500 hospitalization benefit per night.',
+                        'bima ke plans kya hain': 'BIMA ke plans mein Bronze, Silver aur Gold shamil hain. Bronze plan daily PKR 1.2 ka hai.',
+                        'how do i file a claim': 'To file a claim, contact your insurance provider with your discharge slip and CNIC copies.'
+                    };
+                    
+                    const lowerMessage = message.toLowerCase();
+                    const response = responses[lowerMessage] || 'I can help you with insurance plans, claims, and healthcare questions. Please ask me something specific!';
+                    
+                    const language = /[a-z]+\s+(ke|kya|hain|mein)\s+[a-z]+/i.test(message) ? 'roman_urdu' : 'english';
+                    
+                    return {
+                        response,
+                        language_detected: language
+                    };
+                }
+            };
+        }
+    </script>
+</body>
+</html>

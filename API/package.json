@@ -1,0 +1,37 @@
+{
+  "name": "fikrfree-assistant-sdk",
+  "version": "1.0.0",
+  "description": "JavaScript SDK for FikrFree Assistant API - Healthcare chatbot with bilingual support",
+  "main": "fikrfree-client-sdk.js",
+  "scripts": {
+    "test": "node fikrfree-client-sdk.js",
+    "demo": "node fikrfree-client-sdk.js"
+  },
+  "keywords": [
+    "healthcare", 
+    "insurance", 
+    "chatbot", 
+    "api", 
+    "sdk",
+    "fikrfree",
+    "pakistan",
+    "bilingual",
+    "roman-urdu"
+  ],
+  "author": "FikrFree Team",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^3.3.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/fikrfree-api"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/fikrfree-api/issues"
+  },
+  "homepage": "https://your-domain.com"
+}
