@@ -8,3 +8,4 @@ start_uvicorn.bat
 .python-version
 __pycache__/
 app/__pycache__/.env
+venv/
