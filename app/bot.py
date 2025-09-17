@@ -52,6 +52,43 @@ def stream_text(text: str, chunk_size: int = 10):
     for i in range(0, len(text), chunk_size):
         yield text[i : i + chunk_size]
 
+def _trim(s: str, n: int = 140) -> str:
+    s = (s or "").strip()
+    return s if len(s) <= n else s[: n - 1].rstrip() + "…"
+
+def _format_sources(nodes) -> str:
+    """Return a simple list of links only, deduplicated."""
+    if not nodes:
+        return ""
+    links = []
+    seen = set()
+    for n in nodes:
+        md = getattr(n, "metadata", None) or {}
+        link = (md.get("deep_link") or "").strip()
+        if link and link not in seen:
+            seen.add(link)
+            links.append(link)
+        if len(links) >= 5:
+            break
+    if not links:
+        return ""
+    lines = ["**Sources:**"]
+    lines.extend(f"- {u}" for u in links)
+    return "\n".join(lines)
+
+def _style_tail(ctas: bool = True, disclaimer: bool = True) -> str:
+    bits = []
+    if ctas:
+        bits.append("\n**Next:** Compare plans | Start quote")
+    if disclaimer:
+        bits.append("\n**Disclaimer:** Information is for guidance only; benefits depend on policy terms and insurer approval.")
+    return "".join(bits)
+
+def _is_emergency(text: str) -> bool:
+    t = text.lower()
+    keywords = ["emergency", "bleeding", "heart attack", "stroke", "unconscious", "ambulance", "choking", "severe pain"]
+    return any(k in t for k in keywords)
+
 DEFAULT_RESPONSES = [
     "Hello! How can I help you today?",
     "Hi there! What would you like to know?",
@@ -211,9 +248,179 @@ def _format_row_answer(row: Dict[str, str]) -> str:
     return "\n".join(lines)
 
 def preprocess_prompt(prompt: str) -> str:
-    prompt = prompt.strip()
-    prompt = " ".join(prompt.split())
-    return prompt
+    # Preserve newlines so explicit compare lists survive processing
+    if prompt is None:
+        return ""
+    p = str(prompt).replace("\r\n", "\n").replace("\r", "\n")
+    # Normalize spaces per line but keep line breaks
+    lines = [" ".join(line.split()) for line in p.split("\n")]
+    return "\n".join(lines).strip()
+
+# --- Shortlist intent helpers ---
+def _parse_budget(text: str) -> Optional[float]:
+    m = re.search(r"(?:pkr|rs\.?|rupees)?\s*([\d,.]{3,})\s*(?:per\s*month|monthly|/mo|mo)?", text, flags=re.I)
+    if not m:
+        return None
+    try:
+        val = float(m.group(1).replace(",", ""))
+        # Heuristic: if value likely daily (< 200), convert to monthly
+        if val < 200:
+            return val * 30
+        return val
+    except Exception:
+        return None
+
+def _price_monthly_from_row(row: Dict[str, str]) -> Optional[float]:
+    def _num(s: str) -> Optional[float]:
+        s = (s or "").strip()
+        if not s:
+            return None
+        m = re.search(r"([\d,.]+)", s)
+        if not m:
+            return None
+        try:
+            return float(m.group(1).replace(",", ""))
+        except Exception:
+            return None
+    monthly = _num(row.get("MonthlyPrice", ""))
+    if monthly:
+        return monthly
+    postpaid = _num(row.get("PostpaidMonthly", ""))
+    if postpaid:
+        return postpaid
+    prepaid_daily = _num(row.get("PrepaidDaily", ""))
+    if prepaid_daily:
+        return prepaid_daily * 30
+    return None
+
+def _collect_candidates(budget: Optional[float]=None, max_items: int=3) -> List[Dict[str, str]]:
+    items = []
+    for (pn_norm, variant_norm), row in CATALOG.items():
+        price = _price_monthly_from_row(row)
+        if price is None:
+            continue
+        row_copy = dict(row)
+        row_copy["_price_monthly"] = price
+        items.append(row_copy)
+    if not items:
+        return []
+    if budget:
+        # Rank by closeness to budget, prefer <= budget
+        def score(r):
+            p = r["_price_monthly"]
+            penalty = 0 if p <= budget else 0.2  # small penalty if above budget
+            return abs(p - budget) + penalty * budget
+        items.sort(key=score)
+    else:
+        items.sort(key=lambda r: r["_price_monthly"])  # low to high
+    # Deduplicate by product+variant (already unique) and take top
+    return items[:max_items]
+
+def _format_shortlist_table(rows: List[Dict[str, str]]) -> str:
+    if not rows:
+        return "Sorry, I couldn't find plans to recommend right now."
+    lines = []
+    lines.append("### Recommended Plans")
+    lines.append("| Plan | Variant | Monthly (PKR) | Highlight |")
+    lines.append("|---|---:|---:|---|")
+    for r in rows:
+        plan = (r.get("ProductName", "").strip() or "–")
+        variant = (r.get("Variant", "").strip() or "–")
+        price = int(round(r.get("_price_monthly", 0)))
+        hi = (r.get("Benefit1", "").strip() or r.get("Description1", "").strip() or "–")
+        lines.append(f"| {plan} | {variant} | {price:,} | {hi} |")
+    lines.append("")
+    lines.append("**Why these:** Based on your prompt and pricing signals.")
+    lines.append("**Disclaimer:** Estimated pricing; confirm details before purchase.")
+    lines.append("\n**Refine:** Tell me your city, dependents, and monthly budget to tailor suggestions.")
+    # Add links
+    links = []
+    for r in rows:
+        pid = (r.get("ProductID", "") or "")
+        m = re.search(r"https?://\S+", pid)
+        link = m.group(0) if m else ""
+        if link:
+            links.append(f"- {r.get('ProductName','').strip()} {r.get('Variant','').strip()}: {link}")
+    if links:
+        lines.append("\n**Learn more:**\n" + "\n".join(links))
+    return "\n".join(lines)
+
+def _looks_like_shortlist_intent(prompt: str) -> bool:
+    p = prompt.lower()
+    # Show shortlist (3+) for explicit recommendation or generic plan discovery
+    keywords = [
+        "recommend", "suggest", "shortlist", "best plan",
+        "within", "under", "budget", "plans", "plan", "insurance plans",
+        "options", "packages"
+    ]
+    return any(k in p for k in keywords)
+
+def _find_row_fuzzy(product_hint: str, variant_hint: str) -> Optional[Dict[str, str]]:
+    """Lightweight fuzzy lookup used by suggestion flow."""
+    pnorm = _norm(product_hint)
+    vnorm = _norm(variant_hint.replace("plan", "").strip()) if variant_hint else ""
+    # exact product
+    product_rows = [(var, row) for (p, var), row in CATALOG.items() if p == pnorm]
+    if not product_rows:
+        best = _best_product_match(product_hint)
+        if not best:
+            return None
+        pnorm = _norm(best)
+        product_rows = [(var, row) for (p, var), row in CATALOG.items() if p == pnorm]
+        if not product_rows:
+            return None
+    # prefer requested variant, else pick cheapest
+    for var, row in product_rows:
+        if vnorm and var == vnorm:
+            return row
+    best_row, best_price = None, None
+    for var, row in product_rows:
+        price = _price_monthly_from_row(row) or 0
+        if best_row is None or price < best_price:
+            best_row, best_price = row, price
+    return best_row
+
+def _suggest_alternative(product_name: str, variant: str) -> Optional[Dict[str, str]]:
+    """Suggest an alternative row: next variant in same product, else closest price from another product."""
+    base = _find_row_fuzzy(product_name, variant)
+    if not base:
+        return None
+    pn = (base.get("ProductName") or "").strip()
+    cur_var = _norm(base.get("Variant") or variant)
+    cur_price = _price_monthly_from_row(base) or 0
+    # Same product variants sorted by price
+    variants = [(var, row) for (p, var), row in CATALOG.items() if p == _norm(pn)]
+    variants = [(var, row, _price_monthly_from_row(row) or 0) for var, row in variants]
+    higher = sorted([r for r in variants if r[2] > cur_price], key=lambda x: x[2])
+    lower = sorted([r for r in variants if r[2] < cur_price], key=lambda x: -x[2])
+    for var, row, price in higher + lower:
+        if var != cur_var:
+            return row
+    # Otherwise, pick nearest price from another product
+    best_row, best_gap = None, 1e9
+    for (p, var), row in CATALOG.items():
+        if p == _norm(pn):
+            continue
+        price = _price_monthly_from_row(row)
+        if price is None:
+            continue
+        gap = abs(price - cur_price)
+        if gap < best_gap:
+            best_row, best_gap = row, gap
+    return best_row
+
+def _dominant_product_from_nodes(nodes) -> Optional[str]:
+    counts: Dict[str, int] = {}
+    for n in nodes or []:
+        name = (getattr(n, 'metadata', None) or {}).get('product_name') or ''
+        name = str(name).strip()
+        if not name:
+            continue
+        counts[name] = counts.get(name, 0) + 1
+    if not counts:
+        return None
+    # Return the most frequent product name
+    return max(counts.items(), key=lambda kv: kv[1])[0]
 
 # --- Language detection tuned for Roman Urdu vs English ---
 def detect_language(text: str) -> str:
@@ -275,7 +482,8 @@ chat_engine = index.as_chat_engine(
         "Use the provided documents to answer questions about healthcare plans, insurance coverage, partner platforms "
         "(e.g., OlaDoc, MedIQ, BIMA, EFU, Waada, WedDoc), doctor consultation/booking, telemedicine, claims, pricing, "
         "eligibility, and SOPs. If a user asks 'Who are you?' introduce yourself and capabilities. "
-        "Format responses in Markdown: use short headings, bold field labels, and bullet points for lists. Keep links as plain URLs.\n\n"
+        "Format responses in Markdown: use short headings, bold field labels, and bullet points for lists. Keep links as plain URLs. "
+        "When listing or recommending plans, ALWAYS include the product name and variant together in the form '{ProductName} — {Variant}'. Avoid listing variants alone.\n\n"
         "Documents:\n{context_str}\n\n"
         "Instruction: If user asks something relevant that is not in the documents, you can answer provided it is related to insurance, healthcare or FikrFree' "
         "If the user gives a short code or identifier, map it from context if available. Keep answers concise (<=150 words)."
@@ -307,6 +515,24 @@ async def chat(prompt: str):
         if len(conversation_history) > 8:
             conversation_history[:] = conversation_history[-8:]
 
+        # --- Suggestion trigger (from UI) ---
+        try:
+            if preprocessed_prompt.startswith("SUGGEST_ALTERNATIVE:"):
+                m = re.search(r"SUGGEST_ALTERNATIVE:\s*(.+?)\s*[—-]\s*(Bronze|Silver|Gold|Platinum|Diamond|Ace|Crown|Default)\b", preprocessed_prompt, flags=re.I)
+                if m:
+                    prod = m.group(1).strip()
+                    var = m.group(2).strip()
+                    alt = _suggest_alternative(prod, var)
+                    if alt:
+                        answer = "### Suggested Alternative\n" + _format_row_answer(alt) + _style_tail(ctas=True, disclaimer=True)
+                    else:
+                        answer = "Sorry, I couldn't find a similar alternative right now."
+                    for chunk in stream_text(answer):
+                        yield chunk
+                    return
+        except Exception:
+            pass
+
         # --- Precise product/variant lookup (CSV-backed) ---
         try:
             variant = _extract_variant(preprocessed_prompt)
@@ -314,7 +540,7 @@ async def chat(prompt: str):
             if variant and prod:
                 row = _lookup_variant_row(prod, variant)
                 if row:
-                    answer = _format_row_answer(row)
+                    answer = _format_row_answer(row) + _style_tail(ctas=True, disclaimer=True)
                     for chunk in stream_text(answer):
                         yield chunk
                     conversation_history.append(ChatMessage(role=MessageRole.SYSTEM, content=answer))
@@ -322,6 +548,41 @@ async def chat(prompt: str):
                     return
         except Exception:
             pass
+
+        # --- Shortlist/compare intent ---
+        try:
+            if _is_emergency(preprocessed_prompt):
+                resp = (
+                    "This sounds urgent. Please call 1122 immediately or go to the nearest emergency department. "
+                    "I’ll pause here to keep you safe."
+                )
+                for chunk in stream_text(resp):
+                    yield chunk
+                return
+            if _looks_like_shortlist_intent(preprocessed_prompt):
+                # If explicit list of plans is provided (Compare button), honor it
+                explicit = _parse_explicit_plan_list(preprocessed_prompt)
+                if explicit:
+                    candidates = _collect_by_explicit_list(explicit)
+                    if not candidates:
+                        # fall back to generic scoring
+                        budget = _parse_budget(preprocessed_prompt)
+                        max_items = 5 if re.search(r"monthly\s+plans?|per\s*month", preprocessed_prompt, flags=re.I) else 3
+                        candidates = _collect_candidates(budget=budget, max_items=max_items)
+                else:
+                    budget = _parse_budget(preprocessed_prompt)
+                    # If user asked broadly for monthly plans, show more rows
+                    max_items = 5 if re.search(r"monthly\s+plans?|per\s*month", preprocessed_prompt, flags=re.I) else 3
+                    candidates = _collect_candidates(budget=budget, max_items=max_items)
+                answer = _format_shortlist_table(candidates) + _style_tail(ctas=True, disclaimer=True)
+                for chunk in stream_text(answer):
+                    yield chunk
+                conversation_history.append(ChatMessage(role=MessageRole.SYSTEM, content=answer))
+                print("Response type: Shortlist")
+                return
+        except Exception as e:
+            # Fail open to general flow
+            print(f"Shortlist intent error: {e}")
 
         # --- Roman Urdu flow ---
         if is_roman_urdu(preprocessed_prompt):
@@ -342,7 +603,8 @@ async def chat(prompt: str):
                 "2) No Urdu script.\n"
                 "3) Keep it natural and concise (<=150 words).\n"
                 "4) Format in Markdown: short headings, bold labels, and bullet points.\n"
-                "5) If answer is not in context, say: 'Maazrat, mujhay is barey mein maloomat nahi mili.'\n\n"
+                "5) When listing or recommending plans, ALWAYS include the product name and variant together in the form '{ProductName} — {Variant}'.\n"
+                "6) If answer is not in context, say: 'Maazrat, mujhay is barey mein maloomat nahi mili.'\n\n"
                 "Context:\n{context_str}\n"
             )
             ru_engine = index.as_chat_engine(
@@ -356,6 +618,19 @@ async def chat(prompt: str):
             async for t in stream.async_response_gen():
                 full += t
                 yield t
+            # Append product + sources + tail after answer
+            # If the answer lists variants but not product, add a product line
+            dom = _dominant_product_from_nodes(nodes)
+            if dom:
+                tail_prod = f"\n\n**Product:** {dom}"
+                for chunk in stream_text(tail_prod):
+                    yield chunk
+            src_block = _format_sources(nodes)
+            if src_block:
+                for chunk in stream_text("\n\n" + src_block):
+                    yield chunk
+            for chunk in stream_text(_style_tail(ctas=True, disclaimer=True)):
+                yield chunk
             conversation_history.append(ChatMessage(role=MessageRole.SYSTEM, content=full.strip()))
             print("Response language: Roman Urdu")
             return
@@ -375,6 +650,18 @@ async def chat(prompt: str):
         async for t in stream.async_response_gen():
             full += t
             yield t
+        # Append product + sources + tail after answer
+        dom = _dominant_product_from_nodes(nodes)
+        if dom:
+            tail_prod = f"\n\n**Product:** {dom}"
+            for chunk in stream_text(tail_prod):
+                yield chunk
+        src_block = _format_sources(nodes)
+        if src_block:
+            for chunk in stream_text("\n\n" + src_block):
+                yield chunk
+        for chunk in stream_text(_style_tail(ctas=True, disclaimer=True)):
+            yield chunk
         conversation_history.append(ChatMessage(role=MessageRole.SYSTEM, content=full.strip()))
         print("Response language: English")
 

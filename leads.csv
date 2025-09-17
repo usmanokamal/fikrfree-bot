@@ -1,0 +1,4 @@
+timestamp,name,age,city,dependents,budget_pkr,intent,product_interest,session_id
+2025-09-08T15:12:59.802961,Hamza,25,Lahore,2,10000.0,buy,,2520dc76-3685-408c-bb92-9db70ae68bd8
+2025-09-09T12:29:57.469738,Aftab,25,Islamabad,2,50000.0,buy,,d8a0c0af-3a10-431f-b5e3-69c53d4e477d,,
+2025-09-09T12:33:15.281961,Hamza,30,Islamabad,1,500.0,inquire,,fa623766-dd69-48ee-8483-e739a2cf0bdf,,

@@ -21,12 +21,13 @@ body{
     radial-gradient(1000px 600px at -10% 10%, rgba(0,192,224,0.22), transparent 60%),
     var(--ff-bg);
   display:flex; justify-content:center; align-items:center;
-  min-height:100vh; margin:0; padding:20px;
+  /* Use modern dynamic viewport units for mobile browser UI chrome */
+  min-height:100dvh; margin:0; padding:20px;
   color:var(--ff-text);
 }
 
 .container{
-  width:100%; max-width:880px; height:90vh;
+  width:100%; max-width:880px; height:90dvh;
   background:var(--ff-card); border-radius:20px;
   box-shadow: 0 18px 50px rgba(16,18,28,.14);
   display:flex; flex-direction:column; overflow:hidden; position:relative;
@@ -61,6 +62,8 @@ body{
   display:flex; flex-direction:column; gap:10px;
   padding:16px; margin:12px; border-radius:16px;
   box-shadow: inset 0 1px 6px rgba(16,18,28,.05);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .chat-box::-webkit-scrollbar{ width:8px }
 .chat-box::-webkit-scrollbar-thumb{ background:#CFEFF3; border-radius:10px }
@@ -70,7 +73,7 @@ body{
   margin:6px 0; padding:14px 16px; border-radius:14px; max-width:78%;
   display:flex; align-items:flex-start; gap:10px;
   box-shadow:0 6px 18px rgba(16,18,28,.06);
-  word-wrap:break-word; overflow-wrap:break-word;
+  word-wrap:break-word; overflow-wrap:anywhere; /* handle long URLs gracefully on mobile */
   animation:fadeUp .22s ease-out;
 }
 @keyframes fadeUp{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
@@ -80,9 +83,13 @@ body{
 
 .bot img{ width:22px; height:22px; border-radius:6px; flex-shrink:0 }
 
+/* Make markdown tables scrollable on small screens */
+.md-table{ display:block; width:100%; overflow-x:auto }
+
 /* Input */
-.input-area{ padding:16px 18px; background:#fff; border-top:1px solid #E8EEF1 }
-.input-container{ display:flex; gap:10px; align-items:center }
+.input-area{ padding:16px 18px calc(16px + env(safe-area-inset-bottom, 0px)); background:#fff; border-top:1px solid #E8EEF1 }
+/* Let controls wrap naturally on small screens */
+.input-container{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
 .input-wrapper{ position:relative; flex:1 }
 #user-input{
   width:100%; padding:14px 48px 14px 14px; border:2px solid #DDE7EA; border-radius:12px;
@@ -107,6 +114,10 @@ body{
 .btn-secondary{ background:#E5E7EB; color:#111827 }
 #stop-btn{ background:linear-gradient(135deg, #ef4444, #f87171); color:white }
 
+/* Icon + label buttons (footer) */
+.icon-label-btn{ display:inline-flex; align-items:center; gap:8px }
+.icon-label-btn svg{ display:block }
+
 /* Feedback */
 .bot-message-wrapper{ width:100%; display:flex; flex-direction:column; gap:8px }
 .bot-content-container{ display:flex; align-items:flex-start; gap:10px }
@@ -125,16 +136,76 @@ body{
   background:linear-gradient(135deg, var(--ff-accent), var(--ff-primary));
   border:1px solid rgba(0,192,224,.28); color:#073B4C; border-radius:999px;
   padding:6px 12px; font-size:12px; font-weight:600; min-width:36px; height:30px;
+  white-space:nowrap; /* prevent vertical letter wrapping on narrow widths */
 }
 
+/* Action chips (Compare / Start quote) */
+.action-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 12px; height:30px; border-radius:999px; font-size:12px; font-weight:600;
+  border:1px solid #B9E8ED; background:#ffffff; color:#0CA5B0; cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+  white-space:nowrap; /* do not wrap label on narrow screens */
+}
+.action-chip:hover{ transform:translateY(-1px); box-shadow:0 4px 10px rgba(16,18,28,.10) }
+.action-chip.primary{ background:linear-gradient(135deg, var(--ff_primary, var(--ff-primary)), var(--ff-accent)); color:#053b37; border-color:rgba(0,192,224,.28) }
+.action-chip svg{ width:14px; height:14px; display:block }
+
 /* Mobile */
-.container.mobile-view{ max-width:420px; height:85vh }
+.container.mobile-view{ max-width:420px; height:calc(100dvh - 24px) }
 .container.mobile-view .chat-box{ margin:10px; padding:14px }
 .container.mobile-view .chat-bubble{ max-width:86% }
 .container.mobile-view #mic-btn{ width:34px; height:34px }
-@media (max-width: 520px){
+
+/* Compact rules specifically when the UI is in mobile-view mode
+   regardless of pixel width (applies when the toggle is used) */
+.container.mobile-view .feedback-container{ flex-wrap:wrap; justify-content:flex-end; padding-left:0 }
+.container.mobile-view .action-chip span{ display:none }
+.container.mobile-view .action-chip{ width:32px; min-width:32px; height:28px; padding:0; justify-content:center }
+.container.mobile-view .action-chip svg{ width:12px; height:12px }
+.container.mobile-view .translate-btn .btn-label{ display:none }
+.container.mobile-view .translate-btn{ width:32px; min-width:32px; height:28px; padding:0; display:inline-flex; align-items:center; justify-content:center }
+.container.mobile-view .feedback-btn{ width:30px; height:30px }
+.container.mobile-view .input-container{ gap:10px; align-items:center; flex-wrap:nowrap }
+.container.mobile-view .input-wrapper{ flex:1 1 auto; min-width:0 }
+.container.mobile-view #send-btn, .container.mobile-view #lead-btn, .container.mobile-view #stop-btn{ width:44px; min-width:44px; height:38px; padding:0; display:inline-flex; align-items:center; justify-content:center }
+.container.mobile-view .icon-label-btn .btn-label{ display:none }
+
+@media (max-width: 640px){
+  .header-area{ padding:12px 14px }
+  .brand-logo{ width:32px; height:32px }
+  .app-title{ font-size:1.25rem }
+  .tagline{ font-size:.85rem }
+  .chat-box{ margin:10px; padding:12px }
   .btn{ padding:10px 14px; font-size:12px }
-  #user-input{ padding:12px 42px 12px 12px }
+  #user-input{ padding:12px 42px 12px 12px; font-size:14px }
+  .feedback-container{ flex-wrap:wrap; justify-content:flex-end; padding-left:0 }
+}
+
+@media (max-width: 420px){
+  /* Stack actions under input when space is tight */
+  .input-container{ gap:8px; align-items:center }
+  .btn{ padding:8px 12px; font-size:11.5px }
+  #send-btn, #lead-btn, #stop-btn{ flex:0 0 auto }
+  .chat-bubble{ font-size:14px; line-height:1.35 }
+  .action-chip{ height:26px; padding:4px 10px; font-size:11px }
+  .action-chip svg{ width:12px; height:12px }
+  .translate-btn{ height:26px; padding:4px 10px; font-size:11px }
+  .feedback-btn{ width:30px; height:30px }
+  .feedback-container{ gap:6px; justify-content:flex-end; padding-left:0 }
+
+  /* Icon-only actions for compact mobile UI */
+  .action-chip span{ display:none }
+  .action-chip{ width:30px; min-width:30px; padding:0; justify-content:center }
+  .translate-btn .btn-label{ display:none }
+  .translate-btn{ width:30px; min-width:30px; padding:0; display:inline-flex; align-items:center; justify-content:center }
+
+  /* Footer buttons become icon-only and smaller, input takes most space */
+  .icon-label-btn .btn-label{ display:none }
+  #send-btn, #lead-btn{ width:44px; min-width:44px; padding:0; display:inline-flex; align-items:center; justify-content:center; height:38px }
+  #stop-btn{ width:44px; min-width:44px; height:38px; padding:0 }
+  .input-wrapper{ flex:1 1 auto; min-width:0 }
+  #user-input{ font-size:15px }
 }
 
 #mic-btn svg{display:block}

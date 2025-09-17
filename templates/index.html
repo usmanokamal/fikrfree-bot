@@ -48,8 +48,46 @@
           </button> -->
         </div>
         <button id="send-btn" class="btn btn-primary" onclick="sendMessage()">Send</button>
+        <button id="lead-btn" class="btn btn-secondary" onclick="openLeadForm()" title="Share details for a tailored quote">Get Quote</button>
         <button id="stop-btn" class="btn btn-secondary" onclick="stopResponse()" style="display:none">Stop</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Lead capture modal -->
+  <div id="lead-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:1000;">
+    <div style="background:#fff;max-width:520px;margin:6% auto;padding:16px 18px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.14);">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h3 style="margin:6px 0 12px;font-size:1.1rem;">Get a tailored quote</h3>
+        <button onclick="closeLeadForm()" style="border:none;background:transparent;font-size:1.2rem;cursor:pointer">×</button>
+      </div>
+      <form id="lead-form" onsubmit="submitLeadForm(event)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;">
+          <input id="lead-name" placeholder="Name (optional)" style="padding:8px;border:1px solid #ddd;border-radius:6px;"/>
+          <input id="lead-city" placeholder="City" style="padding:8px;border:1px solid #ddd;border-radius:6px;"/>
+          <input id="lead-age" type="number" min="0" max="120" placeholder="Age" style="padding:8px;border:1px solid #ddd;border-radius:6px;"/>
+          <input id="lead-dependents" type="number" min="0" placeholder="Dependents" style="padding:8px;border:1px solid #ddd;border-radius:6px;"/>
+          <input id="lead-budget" type="number" min="0" placeholder="Budget (PKR/month)" style="padding:8px;border:1px solid #ddd;border-radius:6px;grid-column:span 2;"/>
+          <input id="lead-phone" placeholder="Phone (optional)" style="padding:8px;border:1px solid #ddd;border-radius:6px;"/>
+          <input id="lead-cnic" placeholder="CNIC (13 digits, optional)" style="padding:8px;border:1px solid #ddd;border-radius:6px;"/>
+          <select id="lead-intent" style="padding:8px;border:1px solid #ddd;border-radius:6px;grid-column:span 2;">
+            <option value="buy">Buying new plan</option>
+            <option value="renew">Renewing</option>
+            <option value="inquire">Just exploring</option>
+            <option value="claims">Claims help</option>
+          </select>
+          <input id="lead-product" placeholder="Product interest (optional)" style="padding:8px;border:1px solid #ddd;border-radius:6px;grid-column:span 2;"/>
+        </div>
+        <label style="display:block;margin:10px 2px 12px;">
+          <input id="lead-consent" type="checkbox" required />
+          <span>I agree to share these details for a quote.</span>
+        </label>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button type="button" onclick="closeLeadForm()" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit</button>
+        </div>
+        <div id="lead-status" style="margin-top:8px;font-size:0.9rem;"></div>
+      </form>
     </div>
   </div>
 </body>

@@ -15,6 +15,9 @@ from pydantic import BaseModel, Field
 from app.bot import chat as bot_chat, detect_language
 from app.session_manager import session_manager, SessionManager
 from llama_index.core.base.llms.types import MessageRole
+import json
+import csv
+import os
 
 # API Router
 api_v1_router = APIRouter(prefix="/api/v1", tags=["FikrFree Assistant API"])
@@ -53,6 +56,25 @@ class ErrorResponse(BaseModel):
     error: str
     message: str
     timestamp: str
+
+# Lead and Event models
+class LeadRequest(BaseModel):
+    consent: bool = Field(..., description="User consent to store details")
+    name: Optional[str] = Field(default=None)
+    age: Optional[int] = Field(default=None, ge=0, le=120)
+    city: Optional[str] = Field(default=None)
+    dependents: Optional[int] = Field(default=None, ge=0)
+    budget_pkr: Optional[float] = Field(default=None, ge=0)
+    intent: Optional[str] = Field(default=None, description="buy|renew|inquire|claims|other")
+    product_interest: Optional[str] = Field(default=None)
+    session_id: Optional[str] = Field(default=None)
+    phone: Optional[str] = Field(default=None, description="Optional phone number")
+    cnic: Optional[str] = Field(default=None, description="Optional Pakistani CNIC (13 digits)")
+
+class EventLog(BaseModel):
+    event: str
+    session_id: Optional[str] = None
+    metadata: Optional[dict] = None
 
 # Helper Functions
 def get_session_or_404(session_id: str):
@@ -277,3 +299,68 @@ async def get_sessions_stats():
     }
 
 # Note: Exception handlers are added at the app level in main.py, not router level
+
+@api_v1_router.post("/leads")
+async def create_lead(lead: LeadRequest):
+    """Store a structured lead in CSV with consent."""
+    if not lead.consent:
+        raise HTTPException(status_code=400, detail="Consent required to store lead")
+    csv_file = "leads.csv"
+    exists = os.path.isfile(csv_file)
+    # Basic validations and masking
+    def _digits(s: Optional[str]) -> str:
+        return "".join(ch for ch in (s or "") if ch.isdigit())
+    phone_digits = _digits(lead.phone) if lead.phone else ""
+    if phone_digits and len(phone_digits) < 10:
+        raise HTTPException(status_code=400, detail="Phone seems invalid")
+    cnic_digits = _digits(lead.cnic) if lead.cnic else ""
+    masked_cnic = ""
+    if cnic_digits:
+        if len(cnic_digits) != 13:
+            raise HTTPException(status_code=400, detail="CNIC must be 13 digits")
+        masked_cnic = f"{cnic_digits[:5]}-{cnic_digits[5:12]}-{cnic_digits[12:]}"
+        # Mask middle 7 digits
+        masked_cnic = masked_cnic.replace(cnic_digits[5:12], "*******")
+
+    data = {
+        "timestamp": datetime.now().isoformat(),
+        "name": lead.name or "",
+        "age": lead.age if lead.age is not None else "",
+        "city": lead.city or "",
+        "dependents": lead.dependents if lead.dependents is not None else "",
+        "budget_pkr": lead.budget_pkr if lead.budget_pkr is not None else "",
+        "intent": (lead.intent or "").lower(),
+        "product_interest": lead.product_interest or "",
+        "session_id": lead.session_id or "",
+        "phone": phone_digits or "",
+        "cnic_masked": masked_cnic or "",
+    }
+    with open(csv_file, "a", newline="", encoding="utf-8") as f:
+        fieldnames = list(data.keys())
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        if not exists:
+            w.writeheader()
+        w.writerow(data)
+    return {"status": "success", "message": "Lead stored", **data}
+
+@api_v1_router.post("/events")
+async def log_event(event: EventLog):
+    """Log KPI/guardrail events to a CSV (simple analytics)."""
+    csv_file = "events.csv"
+    exists = os.path.isfile(csv_file)
+    data = {
+        "timestamp": datetime.now().isoformat(),
+        "event": event.event,
+        "session_id": event.session_id or "",
+        "metadata": (event.metadata or {}),
+    }
+    with open(csv_file, "a", newline="", encoding="utf-8") as f:
+        fieldnames = ["timestamp", "event", "session_id", "metadata"]
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        if not exists:
+            w.writeheader()
+        # Serialize metadata as JSON string
+        row = dict(data)
+        row["metadata"] = json.dumps(row["metadata"], ensure_ascii=False)
+        w.writerow(row)
+    return {"status": "success", "message": "Event logged"}
